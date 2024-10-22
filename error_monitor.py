@@ -1,54 +1,63 @@
 import traceback
-from flask import request, make_response
-from .client import ErrorMonitoringClient
+import requests
+import uuid
+from flask import request
 from datetime import datetime, timezone
 from werkzeug.exceptions import HTTPException
 
 class ErrorMonitor:
-    def __init__(self, app, endpoint):
+    __endpoint = None
+    __is_endpoint_set = False 
+
+    @classmethod
+    def set_endpoint(cls, endpoint):
+        if not cls.__is_endpoint_set:
+            cls.__endpoint = endpoint
+            cls.__is_endpoint_set = True 
+
+    def __init__(self, app, endpoint=None):
         print('hello error monitor')
+        self.project_id = str(uuid.uuid4())
         self.app = app
-        self.client = ErrorMonitoringClient(endpoint)
+        self.app.register_error_handler(Exception, self.handle_exception)
+        if not ErrorMonitor.__is_endpoint_set:
+            self.set_endpoint(endpoint)
+            
         @app.before_request
         def add_request_timestamp():
-            request.timestamp = datetime.now(timezone.utc)
+            self.timestamp = datetime.now().astimezone()
 
-        self.app.register_error_handler(Exception, self.handle_exception)
+    def capture_exception(self, e):
+        was_handled = True
+        self.handle_exception(e, was_handled)
 
-    def handle_exception(self, e):
-        # set default error status code
-        status_code = 500
+    def log_error(self, error_data):
+        print('attempt to send error')
+        headers = {
+            'Content-Type': 'application/json'
+        }
+        try:
+            response = requests.post(ErrorMonitor.__endpoint, json=error_data, headers=headers)
+            response.raise_for_status() 
+        except requests.RequestException as e:
+            print(f"Failed to send error data: {e}")
 
-        if isinstance(e, HTTPException):
-            status_code = e.code
-        
+    def handle_exception(self, e, was_handled=False):
         raw_error_data = {
-            'type': type(e).__name__,  # Exception class name
-            'message': str(e),  # Exception message
-            'args': e.args,  # Exception arguments
-            'stack_trace': traceback.format_exc(),  # Full stack trace
+            'name': type(e).__name__,
+            'message': str(e),
+            'stack_trace': traceback.format_exc(),
         }
 
-        error_data = {
+        data = {
             'error': raw_error_data,
-            'timestamp':  request.timestamp.isoformat(),
-            'method': request.method,
-            'status_code': status_code
+            'timestamp':  self.timestamp.isoformat(),
+            'handled': was_handled,
+            'project_id': self.project_id
         }
 
         # Send error data to the monitoring service
-        self.client.send_error(error_data)
-        # if self.app.handle_exception:
-        #     self.app.handle_exception(e)
+        self.log_error(data)
 
-        response = {
-            "error": str(e),
-            "stack_trace": traceback.format_exc(),
-            "timestamp": request.timestamp.isoformat(),
-            'method': request.method,
-            'headers': dict(request.headers),
-            'body': request.get_data(as_text=True),
-            'remote_addr': request.remote_addr,
-        }
-
-        raise e
+        if not was_handled:
+            raise e
