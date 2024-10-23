@@ -46,7 +46,7 @@ class ErrorMonitor:
         raw_error_data = {
             'name': type(e).__name__,
             'message': str(e),
-            'stack_trace': traceback.format_exc(),
+            'stack': traceback.format_exc(),
         }
 
         data = {
