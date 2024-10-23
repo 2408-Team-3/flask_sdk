@@ -1,14 +1,14 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='monitor',
+    name='error_monitor',
     version='0.1.1',
-    py_modules=['sdk'],
-    packages=find_packages(),
     install_requires=[
       'Flask',
       'requests',
-      'uuid'
+      'uuid',
+      'datetime',
+      'traceback'
     ],
     python_requires='>=3.6'
 )
