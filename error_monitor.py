@@ -16,7 +16,6 @@ class ErrorMonitor:
             cls.__is_endpoint_set = True 
 
     def __init__(self, app, endpoint=None):
-        print('hello error monitor')
         self.project_id = str(uuid.uuid4())
         self.app = app
         self.app.register_error_handler(Exception, self.handle_exception)
@@ -46,14 +45,14 @@ class ErrorMonitor:
         raw_error_data = {
             'name': type(e).__name__,
             'message': str(e),
-            'stack_trace': traceback.format_exc(),
+            'stack': traceback.format_exc(),
         }
 
         data = {
             'error': raw_error_data,
             'timestamp':  self.timestamp.isoformat(),
             'handled': was_handled,
-            'project_id': self.project_id
+            'projectID': self.project_id
         }
 
         # Send error data to the monitoring service
