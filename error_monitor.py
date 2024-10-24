@@ -1,9 +1,7 @@
 import traceback
 import requests
 import uuid
-from flask import request
-from datetime import datetime, timezone
-from werkzeug.exceptions import HTTPException
+from datetime import datetime
 
 class ErrorMonitor:
     __endpoint = None
@@ -16,11 +14,11 @@ class ErrorMonitor:
             cls.__is_endpoint_set = True 
 
     def __init__(self, app, endpoint=None):
-        self.project_id = str(uuid.uuid4())
+        self.project_id = 123
         self.app = app
         self.app.register_error_handler(Exception, self.handle_exception)
         if not ErrorMonitor.__is_endpoint_set:
-            self.set_endpoint(endpoint)
+            ErrorMonitor.set_endpoint(endpoint)
             
         @app.before_request
         def add_request_timestamp():
@@ -35,8 +33,10 @@ class ErrorMonitor:
         headers = {
             'Content-Type': 'application/json'
         }
+      
         try:
-            response = requests.post(ErrorMonitor.__endpoint, json=error_data, headers=headers)
+            response = requests.post(ErrorMonitor.__endpoint, json={"data": error_data}, headers=headers)
+            print('response', response.text, response.json())
             response.raise_for_status() 
         except requests.RequestException as e:
             print(f"Failed to send error data: {e}")
@@ -52,8 +52,10 @@ class ErrorMonitor:
             'error': raw_error_data,
             'timestamp':  self.timestamp.isoformat(),
             'handled': was_handled,
-            'projectID': self.project_id
+            'project_id': self.project_id
         }
+
+        print('data', data)
 
         # Send error data to the monitoring service
         self.log_error(data)
